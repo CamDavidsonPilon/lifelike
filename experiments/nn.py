@@ -15,11 +15,13 @@ from jax.experimental import stax
 from jax.experimental.stax import Dense, Tanh, Exp, randn
 
 
-BREAKPOINTS = onp.array(list(range(25, 3000, 100)) + [np.inf])
+BREAKPOINTS = np.concatenate(
+    (np.logspace(4, 8, 35, base=np.e), np.array([np.inf]))
+)
 
 
 init_random_params, predict = stax.serial(
-    Dense(16, W_init=randn(1e-7)), Tanh,
+    Dense(22, W_init=randn(1e-7)), Tanh,
     Dense(len(BREAKPOINTS), W_init=randn(1e-7)), Exp
 )
 
@@ -50,12 +52,13 @@ def _log_hazard(params, T):
     return np.log(_hazard(params, T))
 
 def log_likelihood(params, T, E):
+    n = params.shape[0]
     cum_hz = _cumulative_hazard(params, T)
     log_hz = _log_hazard(params, T)
     ll = 0
     ll = ll + (E * log_hz).sum()
     ll = ll + -(cum_hz).sum()
-    return ll/params.shape[0]
+    return ll / n
 
 def get_dataset():
     df = pd.read_csv("colon.csv", index_col=0).dropna()
@@ -91,7 +94,7 @@ def get_dataset():
 
 if __name__ == '__main__':
     # Model parameters
-    L2_reg = .001
+    L2_reg = .0001
     rng = random.PRNGKey(0)
 
     # Training parameters
