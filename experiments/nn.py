@@ -15,13 +15,16 @@ from jax.experimental import stax
 from jax.experimental.stax import Dense, Tanh, Exp, randn
 
 
-BREAKPOINTS = np.concatenate(
-    (np.logspace(4, 8, 35, base=np.e), np.array([np.inf]))
-)
+BREAKPOINTS = np.array([ 151.6315451 ,  247.26450033,  325.13044992,  394.76204949,
+        460.15991777,  523.42898685,  585.87616138,  648.48259447,
+        712.15281294,  777.84625336,  846.62835828,  919.66586609,
+        998.20805999, 1083.69148875, 1178.35481082, 1287.09984318,
+       1421.4311267 , 1599.23478882, 1811.78277612, 2062.31173302,
+       2495.3834345 ,           np.inf])
 
 
 init_random_params, predict = stax.serial(
-    Dense(22, W_init=randn(1e-7)), Tanh,
+    Dense(18, W_init=randn(1e-7)), Tanh,
     Dense(len(BREAKPOINTS), W_init=randn(1e-7)), Exp
 )
 
@@ -77,7 +80,7 @@ def get_dataset():
 
 
     df = df.sample(frac=1., random_state=npr.RandomState(0))
-    df_test, df_train = df.iloc[:100], df.iloc[100:]
+    df_test, df_train = df.iloc[:5], df.iloc[5:]
 
     T_test = df_test.pop('time').values
     E_test = df_test.pop('status').values
@@ -94,7 +97,7 @@ def get_dataset():
 
 if __name__ == '__main__':
     # Model parameters
-    L2_reg = .0001
+    L2_reg = .0000
     rng = random.PRNGKey(0)
 
     # Training parameters
@@ -136,7 +139,7 @@ if __name__ == '__main__':
             train_acc = loss(weights, (X_train, T_train, E_train))
             test_acc = loss(weights, (X_test, T_test, E_test))
             times = np.linspace(1, 3200, 3200)
-            y = _survival_function(predict(weights, X_train[[1]]), times)
+            y = _survival_function(predict(weights, X_train[[0]]), times)
             plt.plot(times, y, c=next(colors), alpha=0.15)
             plt.draw()
             plt.pause(0.0001)
