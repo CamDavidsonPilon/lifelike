@@ -77,8 +77,8 @@ class NonParametric(PiecewiseConstant):
     We create the concentration of breakpoints in proportional to the number of subjects that died at that time.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, n_breakpoints=None):
+        self.n_breakpoints = n_breakpoints
 
     def inform(self, **kwargs):
         T = kwargs.pop("T")
@@ -89,8 +89,7 @@ class NonParametric(PiecewiseConstant):
         super(NonParametric, self).__init__(breakpoints)
 
 
-    @staticmethod
-    def create_breakpoints(observed_event_times, n_breakpoints=None):
+    def create_breakpoints(self, observed_event_times):
 
         def solve_inverse_cdf_problem(p, dist, starting_point=0):
             f = lambda x: dist.integrate_box_1d(0, x) - p
@@ -100,16 +99,17 @@ class NonParametric(PiecewiseConstant):
         n_obs = observed_event_times.shape[0]
         dist = gaussian_kde(observed_event_times)
 
-        if n_breakpoints is None:
-            n_breakpoints = int(n_obs / 20)
+        if self.n_breakpoints is None:
+            n_breakpoints = int(n_obs / 15)
+        else:
+            n_breakpoints = self.n_breakpoints
 
         breakpoints = onp.empty(n_breakpoints+1)
 
         sol = 0
         for i, p in enumerate(np.linspace(0, 1, n_breakpoints+2)[1:-1]):
-            # solve the following simple problem:
+            # solve the following simple root problem:
             # cdf(x) = p
-
             sol = solve_inverse_cdf_problem(p, dist, starting_point=sol)
             breakpoints[i] = sol
 

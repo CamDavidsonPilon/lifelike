@@ -3,7 +3,7 @@ from jax.experimental import optimizers
 
 import lifelike.losses as losses
 from lifelike import Model
-from lifelike.callbacks import Logger
+from lifelike.callbacks import *
 
 
 
@@ -12,7 +12,6 @@ def get_dataset():
     from patsy import dmatrix
     df = pd.read_csv("experiments/colon.csv", index_col=0).dropna()
     df = df[df["etype"] == 2]
-
 
     model_string = """{extent} +
         {rx} +
@@ -35,11 +34,11 @@ model = Model([
     Dense(20), Tanh,
 ])
 
-model.compile(optimizer=optimizers.adam, optimizer_kwargs={'step_size': 0.01},
+model.compile(optimizer=optimizers.adam, optimizer_kwargs={'step_size': 0.001},
               loss=losses.NonParametric())
 
 model.fit(x_train, t_train, e_train,
-    epochs=10000,
+    epochs=100000,
     batch_size=32,
-    callbacks=[Logger(50)]
+    callbacks=[Logger(report_every_n_epochs=50), PlotSurvivalCurve(individual=0)]
 )

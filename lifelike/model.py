@@ -54,7 +54,13 @@ class Model:
             opt_state = update(epoch, opt_state, (X, T, E))
 
             for callback in self.callbacks:
-                callback(epoch, opt_state, get_weights, (X, T, E), loss)
+                callback(epoch,
+                    opt_state=opt_state,
+                    get_weights=get_weights,
+                    batch=(X, T, E),
+                    loss_function=loss,
+                    predict=predict,
+                    loss=self.loss)
 
 
     def compile(self, optimizer=None, loss=None, optimizer_kwargs=None):
