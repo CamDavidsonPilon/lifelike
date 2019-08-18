@@ -1,6 +1,7 @@
 import numpy as onp
 from jax.experimental import stax
 from jax import numpy as np
+from jax import scipy as sp
 from jax import grad, vmap
 from scipy.optimize import root_scalar
 from scipy.stats import gaussian_kde
@@ -19,13 +20,13 @@ class Loss():
         return np.exp(-self.cumulative_hazard(params, t))
 
     def hazard(self, params, t):
-        return vmap(grad(self.cumulative_hazard))(params, t)
+        return grad(self.cumulative_hazard, argnums=1)(params, t)
 
     def log_hazard(self, params, t):
         return np.log(self.hazard(params, t))
 
     def inform(self, **kwargs):
-        raise NotImplementedError()
+        pass
 
 
 
@@ -35,6 +36,7 @@ class GeneralizedGamma(Loss):
 
     def __init__(self, topology):
         self.terminal_layer = [stax.Dense(self.N_OUTPUTS)]
+        raise NotImplementedError()
 
     def cumulative_hazard(self, params, t):
         pass
@@ -43,33 +45,65 @@ class GeneralizedGamma(Loss):
         pass
 
 
+class Mixture(Loss):
+    """
+
+    ::math
+
+        S(t) = p_1 S_{Weibull}(t) + p_2 S_{LogLogistic}(t) + p3
+
+
+    """
+    N_OUTPUTS = 7
+
+
+    def __init__(self):
+        self.terminal_layer = [stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-8), b_init=stax.randn(1e-8))]
+
+
+    def cumulative_hazard(self, params, t):
+        # weights
+        p1, p2, p3 = stax.softmax(params[:3])
+
+        # weibull params
+        lambda_, rho_ = np.exp(params[3]), np.exp(params[4])
+
+        # loglogistic params
+        alpha_, beta_ = np.exp(params[6]), np.exp(params[6])
+
+        return -sp.special.logsumexp(np.hstack((
+            np.log(p1) - (t / lambda_) ** rho_,
+            np.log(p2) - np.log1p((t / alpha_) ** beta_),
+            np.log(p3)
+        )))
+
+
 
 class PiecewiseConstant(Loss):
 
     def __init__(self, breakpoints):
-        self.N_OUTPUTS = len(breakpoints)
-        self.breakpoints = breakpoints
-        self.terminal_layer = [stax.Dense(self.N_OUTPUTS), stax.Exp]
+        self.N_OUTPUTS = len(breakpoints) + 1
+        self.breakpoints = np.hstack(([0], breakpoints, [np.inf]))
+        self.terminal_layer = [stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-7), b_init=stax.randn(1e-7)), stax.Exp]
+        print(self.breakpoints)
 
-    def cumulative_hazard(self, params, T):
-        n = T.shape[0]
-        T = T.reshape((n, 1))
-        M = np.minimum(np.tile(self.breakpoints, (n, 1)), T)
-        M = np.hstack([M[:, tuple([0])], np.diff(M, axis=1)])
-        return (M * params).sum(1)
+    def cumulative_hazard(self, params, t):
+        # I should just append [0] at the start.
+        M = np.minimum(self.breakpoints, t)
+        M = np.diff(M)
+        return (M * params).sum()
 
-    def hazard(self, params, T):
-        """
-        The hazard is trivial for piecewise constant, but Numpy/Jax make it hard =(
-        """
-        n = T.shape[0]
-        T = T.reshape((n, 1))
-        tiles = np.tile(self.breakpoints[:-1], (n, 1))
-
-        # watching issue #1142
-        #ix = onp.searchsorted(self.breakpoints, T)
-        ix = np.argmin(np.maximum(tiles, T) - tiles, 1)
-        return params[np.arange(n), ix]
+    """
+    def hazard(self, params, t):
+        ix = onp.searchsorted(self.breakpoints, t)
+        or
+        ix = 0
+        for tau in self.breakpoints:
+            if t < tau:
+                break
+            ix += 1
+        return params[ix]
+    """
 
 
 class NonParametric(PiecewiseConstant):
@@ -104,7 +138,7 @@ class NonParametric(PiecewiseConstant):
         else:
             n_breakpoints = self.n_breakpoints
 
-        breakpoints = onp.empty(n_breakpoints+1)
+        breakpoints = onp.empty(n_breakpoints)
 
         sol = 0
         for i, p in enumerate(np.linspace(0, 1, n_breakpoints+2)[1:-1]):
@@ -113,7 +147,6 @@ class NonParametric(PiecewiseConstant):
             sol = solve_inverse_cdf_problem(p, dist, starting_point=sol)
             breakpoints[i] = sol
 
-        breakpoints[-1] = np.inf
         return breakpoints
 
 

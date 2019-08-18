@@ -1,4 +1,4 @@
-from jax import jit, grad, random
+from jax import jit, grad, random, vmap
 from jax.experimental import stax
 from lifelike.callbacks import Logger
 
@@ -11,8 +11,8 @@ class Model:
 
     def _log_likelihood(self, params, T, E):
         n = params.shape[0]
-        cum_hz = self.loss.cumulative_hazard(params, T)
-        log_hz = self.loss.log_hazard(params, T)
+        cum_hz = vmap(self.loss.cumulative_hazard)(params, T)
+        log_hz = vmap(self.loss.log_hazard)(params, T)
         ll = 0
         ll = ll + (E * log_hz).sum()
         ll = ll + -(cum_hz).sum()
@@ -21,6 +21,7 @@ class Model:
     #@must_be_compiled_first
     def fit(self, X, T, E, epochs=1000, batch_size=32, callbacks=None):
 
+        X, T, E = X.astype(float), T.astype(float), E.astype(float)
 
         if callbacks is not None:
             self.callbacks.extend(callbacks)

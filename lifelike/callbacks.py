@@ -1,5 +1,6 @@
 
 import numpy as np
+from jax import vmap
 from matplotlib import pyplot as plt
 
 
@@ -32,11 +33,12 @@ class PlotSurvivalCurve(CallBack):
 
     def __call__(self, epoch, opt_state=None, get_weights=None, batch=None, loss=None, predict=None, **kwargs):
         if epoch % self.update_every_n_epochs == 0:
-            times = np.linspace(1, 2000, 2000)
+            times = np.linspace(1, 3200, 3200)
             X, T, E = batch
             weights = get_weights(opt_state)
-            y = loss.survival_function(predict(weights, X[[0]]), times)
+            y = vmap(loss.survival_function, in_axes=(None, 0))(predict(weights, X[self.individual]), times)
             plt.plot(times, y, c='k', alpha=0.15)
+            plt.axvline(T[self.individual], 0, 1, ls="-" if E[self.individual] else "--")
             plt.draw()
             plt.pause(0.0001)
 
