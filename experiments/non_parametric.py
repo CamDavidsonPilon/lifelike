@@ -46,7 +46,7 @@ model = Model([
 ])
 
 model.compile(optimizer=optimizers.adam, optimizer_kwargs={'step_size': 0.001},
-              loss=losses.Mixture())
+              loss=losses.NonParametric())
 
 model.fit(x_train, t_train, e_train,
     epochs=100000,

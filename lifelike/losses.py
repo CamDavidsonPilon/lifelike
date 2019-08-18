@@ -30,6 +30,7 @@ class Loss():
 
 
 
+
 class GeneralizedGamma(Loss):
 
     N_OUTPUTS = 3
@@ -54,7 +55,7 @@ class Mixture(Loss):
 
 
     """
-    N_OUTPUTS = 7
+    N_OUTPUTS = 3 + 2 + 2
 
 
     def __init__(self):
@@ -71,11 +72,12 @@ class Mixture(Loss):
         # loglogistic params
         alpha_, beta_ = np.exp(params[6]), np.exp(params[6])
 
-        return -sp.special.logsumexp(np.hstack((
+        v =  -sp.special.logsumexp(np.hstack((
             np.log(p1) - (t / lambda_) ** rho_,
             np.log(p2) - np.log1p((t / alpha_) ** beta_),
             np.log(p3)
         )))
+        return v
 
 
 
@@ -88,7 +90,6 @@ class PiecewiseConstant(Loss):
         print(self.breakpoints)
 
     def cumulative_hazard(self, params, t):
-        # I should just append [0] at the start.
         M = np.minimum(self.breakpoints, t)
         M = np.diff(M)
         return (M * params).sum()

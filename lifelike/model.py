@@ -33,35 +33,33 @@ class Model:
         self.loss.inform(T=T, E=E)
         self.topology.extend(self.loss.terminal_layer)
 
-        init_random_params, predict = stax.serial(*self.topology)
-        opt_init, opt_update, get_weights = self.optimizer(**self._optimizer_kwargs)
+        init_random_params, self._predict = stax.serial(*self.topology)
 
         @jit
         def loss(weights, batch):
             X, T, E = batch
-            params = predict(weights, X)
+            params = self._predict(weights, X)
             return -self._log_likelihood(params, T, E)# + L2_reg * optimizers.l2_norm(weights)
 
         @jit
         def update(i, opt_state, batch):
-           weights = get_weights(opt_state)
-           return opt_update(i, grad(loss)(weights, batch), opt_state)
+           weights = self.get_weights(opt_state)
+           return self._opt_update(i, grad(loss)(weights, batch), opt_state)
 
 
         _, init_params = init_random_params(random.PRNGKey(0), (-1, X.shape[1])) # why -1?
-        opt_state = opt_init(init_params)
+        self.opt_state = self._opt_init(init_params)
 
+        # training loop
         for epoch in range(epochs):
-            opt_state = update(epoch, opt_state, (X, T, E))
+            self.opt_state = update(epoch, self.opt_state, (X, T, E))
 
             for callback in self.callbacks:
                 callback(epoch,
-                    opt_state=opt_state,
-                    get_weights=get_weights,
+                    self,
                     batch=(X, T, E),
-                    loss_function=loss,
-                    predict=predict,
-                    loss=self.loss)
+                    loss=loss
+                )
 
 
     def compile(self, optimizer=None, loss=None, optimizer_kwargs=None):
@@ -69,6 +67,7 @@ class Model:
         self.compiled = True
         self.optimizer = optimizer
         self._optimizer_kwargs = optimizer_kwargs
+        self._opt_init, self._opt_update, self.get_weights = self.optimizer(**self._optimizer_kwargs)
 
 
     def evaluate(self, X, T, E):
@@ -76,5 +75,6 @@ class Model:
 
 
 
-    def predict(self, X):
-        pass
+    def predict_survival_function(self, x, t):
+        weights = self.get_weights(self.opt_state)
+        return vmap(self.loss.survival_function, in_axes=(None, 0))(self._predict(weights, x), t)
