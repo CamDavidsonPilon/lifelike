@@ -1,6 +1,7 @@
 from jax import jit, grad, random, vmap
 from jax import numpy as np
 from jax.experimental import stax
+from jax.experimental.optimizers import unpack_optimizer_state, pack_optimizer_state
 from lifelike.utils import must_be_compiled_first
 
 class Model:
@@ -9,6 +10,7 @@ class Model:
         self.topology = topology
         self.is_compiled = False
         self.callbacks = []
+
 
     def _log_likelihood(self, params, T, E):
         n = params.shape[0]
@@ -78,3 +80,24 @@ class Model:
         return vmap(self.loss.survival_function, in_axes=(None, 0))(self._predict(weights, x), t)
 
 
+    def __getstate__(self):
+        # thanks I hate it.
+        # This isn't scalable. I should remove this hardcoded
+        d = {
+            'opt_state': unpack_optimizer_state(self.opt_state),
+            'get_weights': self.get_weights,
+            'optimizer': self.optimizer,
+            'is_compiled': self.is_compiled,
+            'loss': self.loss,
+            '_opt_update': self._opt_update,
+            '_opt_init': self._opt_init,
+            '_predict': self._predict,
+            #'topology': self.topology, # anonymous f can't be pickled
+        }
+        return d
+
+
+    def __setstate__(self, d):
+        d['opt_state'] = pack_optimizer_state(d['opt_state'])
+        self.__dict__ = d
+        return

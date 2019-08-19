@@ -11,10 +11,14 @@ def must_be_compiled_first(function):
     return f
 
 
-def save(model, filepath):
-    dill.dump(model, filepath)
+def dump(model, filepath):
+    """filepath is a string"""
+    with open(filepath, "wb") as f:
+        dill.dump(model, f)
 
 
 
 def load(filepath):
-    dill.load(filepath)
+    """filepath is a string"""
+    with open(filepath, "rb") as f:
+        return dill.load(f)
