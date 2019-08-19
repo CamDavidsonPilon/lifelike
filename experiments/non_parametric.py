@@ -42,14 +42,14 @@ x_train, t_train, e_train = get_colon_dataset()
 
 
 model = Model([
-    Dense(10), Relu,
+    Dense(18), Relu,
 ])
 
-model.compile(optimizer=optimizers.adam, optimizer_kwargs={'step_size': 0.001},
+model.compile(optimizer=optimizers.adam, optimizer_kwargs={'step_size': optimizers.exponential_decay(0.01, 10, 0.999)},
               loss=losses.NonParametric())
 
 model.fit(x_train, t_train, e_train,
     epochs=100000,
     batch_size=32,
-    callbacks=[Logger(report_every_n_epochs=50), PlotSurvivalCurve(individual=101)]
+    callbacks=[Logger(report_every_n_epochs=50), PlotSurvivalCurve(individual=104)]
 )

@@ -23,11 +23,10 @@ class Loss():
         return grad(self.cumulative_hazard, argnums=1)(params, t)
 
     def log_hazard(self, params, t):
-        return np.log(self.hazard(params, t))
+        return np.log(np.maximum(self.hazard(params, t), 1e-30))
 
     def inform(self, **kwargs):
         pass
-
 
 
 
@@ -46,12 +45,12 @@ class GeneralizedGamma(Loss):
         pass
 
 
-class Mixture(Loss):
+class ParametricMixture(Loss):
     """
 
     ::math
 
-        S(t) = p_1 S_{Weibull}(t) + p_2 S_{LogLogistic}(t) + p3
+        S(t | x) = p_1(x) S_{Weibull}(t | x) + p_2(x) S_{LogLogistic}(t | x) + p3(x)
 
 
     """
@@ -64,7 +63,7 @@ class Mixture(Loss):
 
     def cumulative_hazard(self, params, t):
         # weights
-        p1, p2, p3 = stax.softmax(params[:3])
+        p1, p2, p3 = np.maximum(stax.softmax(params[:3]), 1e-25)
 
         # weibull params
         lambda_, rho_ = np.exp(params[3]), np.exp(params[4])
@@ -87,7 +86,6 @@ class PiecewiseConstant(Loss):
         self.N_OUTPUTS = len(breakpoints) + 1
         self.breakpoints = np.hstack(([0], breakpoints, [np.inf]))
         self.terminal_layer = [stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-7), b_init=stax.randn(1e-7)), stax.Exp]
-        print(self.breakpoints)
 
     def cumulative_hazard(self, params, t):
         M = np.minimum(self.breakpoints, t)

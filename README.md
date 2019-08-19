@@ -12,7 +12,7 @@ from jax.experiment import optimizers
 import lifelike.losses as losses
 from lifelike import Model
 from lifelike.callbacks import History, ModelCheckpoint, EarlyStopping
-
+from lifelike.utils import save
 
 
 model = Model([
@@ -35,5 +35,5 @@ model.fit(x_train, t_train, e_train,
 loss_ = model.evaluate(x_test, t_test, e_test)
 
 model.predict(x_novel)
-model.save("filename")
+save(model, "filename")
 ```

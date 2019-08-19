@@ -2,7 +2,7 @@
 import numpy as np
 from jax import vmap
 from matplotlib import pyplot as plt
-
+from lifelike.utils import save
 
 class CallBack:
     pass
@@ -40,4 +40,18 @@ class PlotSurvivalCurve(CallBack):
             plt.axvline(T[self.individual], 0, 1, ls="-" if E[self.individual] else "--")
             plt.draw()
             plt.pause(0.0001)
+
+
+
+
+class SaveModel(CallBack):
+    def __init__(self, filepath, save_every_n_epochs=1):
+        self.filepath = filepath
+        self.save_every_n_epochs = save_every_n_epochs
+
+    def __call__(self, epoch, model):
+        if epoch % self.save_every_n_epochs == 0:
+            save(model, self.filepath)
+
+
 
