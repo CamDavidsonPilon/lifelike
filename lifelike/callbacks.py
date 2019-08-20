@@ -8,19 +8,20 @@ from lifelike.utils import dump
 
 
 class CallBack:
-    pass
+
+    def _compute_loss(self, model, batch, loss):
+        X, T, E = batch
+        weights = model.get_weights(model.opt_state)
+        return loss(weights, (X, T, E))
 
 
 class Logger(CallBack):
-    def __init__(self, report_every_n_epochs=1):
+    def __init__(self, report_every_n_epochs=10):
         self.report_every_n_epochs = report_every_n_epochs
 
-    def __call__(self, epoch, model, batch=None, loss=None, **kwargs):
+    def __call__(self, epoch, model, training_batch=None, loss=None, **kwargs):
         if epoch % self.report_every_n_epochs == 0:
-            X, T, E = batch
-            weights = model.get_weights(model.opt_state)
-            train_acc = loss(weights, (X, T, E))
-            print("Epoch {:d}: Training set accuracy {:f}".format(epoch, train_acc))
+            print("Epoch {:d}: Training set accuracy {:f}".format(epoch, self._compute_loss(model, training_batch, loss)))
 
 
 class PlotSurvivalCurve(CallBack):
@@ -29,10 +30,10 @@ class PlotSurvivalCurve(CallBack):
         self.update_every_n_epochs = update_every_n_epochs
         plt.ion()
 
-    def __call__(self, epoch, model, batch=None, **kwargs):
+    def __call__(self, epoch, model, training_batch=None, **kwargs):
         if epoch % self.update_every_n_epochs == 0:
             times = np.linspace(1, 3200, 3200)
-            X, T, E = batch
+            X, _, _ = training_batch
             y = model.predict_survival_function(X[self.individual], times)
             plt.plot(times, y, c="k", alpha=0.15)
             plt.axvline(
@@ -43,17 +44,17 @@ class PlotSurvivalCurve(CallBack):
 
 
 class ModelCheckpoint(CallBack):
-    def __init__(self, filepath, save_every_n_epochs=25, prepend_timestamp=True):
+    def __init__(self, filepath, save_every_n_epochs=50, prefix_timestamp=True):
         self.filepath = filepath
         self.save_every_n_epochs = save_every_n_epochs
-        self.prepend_timestamp = True
+        self.prefix_timestamp = prefix_timestamp
 
     def __call__(self, epoch, model, **kwargs):
         if epoch % self.save_every_n_epochs == 0:
 
             filepath = (
                 self._prepend_timestamp(self.filepath)
-                if self.prepend_timestamp
+                if self.prefix_timestamp
                 else self.filepath
             )
 
@@ -79,15 +80,21 @@ class EarlyStopping(CallBack):
         self.best_test_loss = np.inf
         self.best_train_loss = np.inf
 
-    def __call__(self, epoch, model, batch=None, loss=None, **kwargs):
-
-        X, T, E = batch
-        weights = model.get_weights(model.opt_state)
-        train_acc = loss(weights, (X, T, E))
+    def __call__(self, epoch, model, training_batch=None, loss=None, **kwargs):
+        train_acc = self._compute_loss(model, training_batch, loss)
 
         if train_acc < self.best_train_loss:
             self.best_train_loss = train_acc
         else:
             if (train_acc - self.best_train_loss) / self.best_train_loss > self.rdelta:
-                print("Stopping early as ", train_acc, self.best_train_loss)
+                print("Stopping early as metric is diverging.")
                 raise StopIteration()
+
+
+class TerminateOnNaN(CallBack):
+
+
+    def __call__(self, epoch, model, training_batch=None, loss=None, **kwargs):
+        if np.isnan(self._compute_loss(model, training_batch, loss)):
+            print("Stopping early due to NaNs.")
+            raise StopIteration()

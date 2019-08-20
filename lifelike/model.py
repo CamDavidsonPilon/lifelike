@@ -60,7 +60,7 @@ class Model:
 
             for callback in self.callbacks:
                 try:
-                    callback(epoch, self, batch=(X, T, E), loss=loss)
+                    callback(epoch, self, training_batch=(X, T, E), loss=loss)
                 except StopIteration:
                     continue_training = False
 

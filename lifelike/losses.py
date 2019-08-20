@@ -3,6 +3,7 @@ from jax.experimental import stax
 from jax import numpy as np
 from jax import scipy as sp
 from jax import grad, vmap
+from jax.scipy.stats import norm
 from scipy.optimize import root_scalar
 from scipy.stats import gaussian_kde
 
@@ -69,7 +70,7 @@ class ParametricMixture(Loss):
         lambda_, rho_ = np.exp(params[3]), np.exp(params[4])
 
         # loglogistic params
-        alpha_, beta_ = np.exp(params[6]), np.exp(params[6])
+        alpha_, beta_ = np.exp(params[5]), np.exp(params[6])
 
         v = -sp.special.logsumexp(
             np.hstack(

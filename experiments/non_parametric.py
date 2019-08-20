@@ -51,7 +51,7 @@ model = Model([Dense(18), Relu])
 model.compile(
     optimizer=optimizers.adam,
     optimizer_kwargs={"step_size": optimizers.exponential_decay(0.01, 10, 0.999)},
-    loss=losses.NonParametric(),
+    loss=losses.ParametricMixture(),
 )
 
 model.fit(
@@ -60,5 +60,10 @@ model.fit(
     e_train,
     epochs=100000,
     batch_size=32,
-    callbacks=[Logger(report_every_n_epochs=1), EarlyStopping()],
+    callbacks=[
+        Logger(),
+        EarlyStopping(),
+        TerminateOnNaN(),
+        ModelCheckpoint("testsavefile.pickle", prefix_timestamp=False)
+    ],
 )
