@@ -11,8 +11,8 @@ from jax.experiment import optimizers
 
 import lifelike.losses as losses
 from lifelike import Model
-from lifelike.callbacks import History, ModelCheckpoint, EarlyStopping
-from lifelike.utils import dump
+from lifelike.callbacks import ModelCheckpoint, Logger
+from lifelike.utils import dump, load
 
 
 model = Model([
@@ -35,5 +35,9 @@ model.fit(x_train, t_train, e_train,
 loss_ = model.evaluate(x_test, t_test, e_test)
 
 model.predict(x_novel)
+
+
+# serialization
 dump(model, "filename.pickle")
+model = load("filename.pickle")
 ```

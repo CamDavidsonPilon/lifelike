@@ -7,7 +7,7 @@ from scipy.optimize import root_scalar
 from scipy.stats import gaussian_kde
 
 
-class Loss():
+class Loss:
     terminal_layer = None
     N_OUTPUTS = None
 
@@ -53,12 +53,13 @@ class ParametricMixture(Loss):
 
 
     """
+
     N_OUTPUTS = 3 + 2 + 2
 
-
     def __init__(self):
-        self.terminal_layer = [stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-8), b_init=stax.randn(1e-8))]
-
+        self.terminal_layer = [
+            stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-8), b_init=stax.randn(1e-8))
+        ]
 
     def cumulative_hazard(self, params, t):
         # weights
@@ -70,21 +71,28 @@ class ParametricMixture(Loss):
         # loglogistic params
         alpha_, beta_ = np.exp(params[6]), np.exp(params[6])
 
-        v =  -sp.special.logsumexp(np.hstack((
-            np.log(p1) - (t / lambda_) ** rho_,
-            np.log(p2) - np.log1p((t / alpha_) ** beta_),
-            np.log(p3)
-        )))
+        v = -sp.special.logsumexp(
+            np.hstack(
+                (
+                    np.log(p1) - (t / lambda_) ** rho_,
+                    np.log(p2) - np.log1p((t / alpha_) ** beta_),
+                    np.log(p3),
+                )
+            )
+        )
         return v
 
 
-
 class PiecewiseConstant(Loss):
-
     def __init__(self, breakpoints):
         self.N_OUTPUTS = len(breakpoints) + 1
         self.breakpoints = np.hstack(([0], breakpoints, [np.inf]))
-        self.terminal_layer = [stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-7), b_init=stax.randn(1e-7)), stax.Exp]
+        self.terminal_layer = [
+            stax.Dense(
+                self.N_OUTPUTS, W_init=stax.randn(1e-7), b_init=stax.randn(1e-7)
+            ),
+            stax.Exp,
+        ]
 
     def cumulative_hazard(self, params, t):
         M = np.minimum(self.breakpoints, t)
@@ -120,13 +128,10 @@ class NonParametric(PiecewiseConstant):
         breakpoints = self.create_breakpoints(T[E.astype(bool)])
         super(NonParametric, self).__init__(breakpoints)
 
-
     def create_breakpoints(self, observed_event_times):
-
         def solve_inverse_cdf_problem(p, dist, starting_point=0):
             f = lambda x: dist.integrate_box_1d(0, x) - p
             return root_scalar(f, x0=starting_point, fprime=dist).root
-
 
         n_obs = observed_event_times.shape[0]
         dist = gaussian_kde(observed_event_times)
@@ -139,14 +144,10 @@ class NonParametric(PiecewiseConstant):
         breakpoints = onp.empty(n_breakpoints)
 
         sol = 0
-        for i, p in enumerate(np.linspace(0, 1, n_breakpoints+2)[1:-1]):
+        for i, p in enumerate(np.linspace(0, 1, n_breakpoints + 2)[1:-1]):
             # solve the following simple root problem:
             # cdf(x) = p
             sol = solve_inverse_cdf_problem(p, dist, starting_point=sol)
             breakpoints[i] = sol
 
         return breakpoints
-
-
-
-

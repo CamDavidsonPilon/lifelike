@@ -4,13 +4,12 @@ from jax.experimental import stax
 from jax.experimental.optimizers import unpack_optimizer_state, pack_optimizer_state
 from lifelike.utils import must_be_compiled_first
 
-class Model:
 
+class Model:
     def __init__(self, topology):
         self.topology = topology
         self.is_compiled = False
         self.callbacks = []
-
 
     def _log_likelihood(self, params, T, E):
         n = params.shape[0]
@@ -39,66 +38,72 @@ class Model:
         def loss(weights, batch):
             X, T, E = batch
             params = self._predict(weights, X)
-            return -self._log_likelihood(params, T, E)# + L2_reg * optimizers.l2_norm(weights)
+            return -self._log_likelihood(
+                params, T, E
+            )  # + L2_reg * optimizers.l2_norm(weights)
 
         @jit
         def update(i, opt_state, batch):
             weights = self.get_weights(opt_state)
             return self._opt_update(i, grad(loss)(weights, batch), opt_state)
 
-
-        _, init_params = init_random_params(random.PRNGKey(0), (-1, X.shape[1])) # why -1?
+        _, init_params = init_random_params(
+            random.PRNGKey(0), (-1, X.shape[1])
+        )  # why -1?
         self.opt_state = self._opt_init(init_params)
 
         # training loop
-        for epoch in range(epochs):
+        epoch = 0
+        continue_training = True
+        while epoch < epochs and continue_training:
             self.opt_state = update(epoch, self.opt_state, (X, T, E))
 
             for callback in self.callbacks:
-                callback(epoch,
-                    self,
-                    batch=(X, T, E),
-                    loss=loss
-                )
+                try:
+                    callback(epoch, self, batch=(X, T, E), loss=loss)
+                except StopIteration:
+                    continue_training = False
 
+            epoch += 1
 
     def compile(self, optimizer=None, loss=None, optimizer_kwargs=None):
         self.loss = loss
         self.is_compiled = True
         self.optimizer = optimizer
         self._optimizer_kwargs = optimizer_kwargs
-        self._opt_init, self._opt_update, self.get_weights = self.optimizer(**self._optimizer_kwargs)
-
+        self._opt_init, self._opt_update, self.get_weights = self.optimizer(
+            **self._optimizer_kwargs
+        )
 
     def evaluate(self, X, T, E):
         pass
 
-
-
     def predict_survival_function(self, x, t):
         weights = self.get_weights(self.opt_state)
-        return vmap(self.loss.survival_function, in_axes=(None, 0))(self._predict(weights, x), t)
-
+        return vmap(self.loss.survival_function, in_axes=(None, 0))(
+            self._predict(weights, x), t
+        )
 
     def __getstate__(self):
         # This isn't scalable. I should remove this hardcoded stuff. Note
         # that _opt_init and _opt_update are not present due to PyCapsule pickling errors.
         d = {
-            'opt_state': unpack_optimizer_state(self.opt_state),
-            'get_weights': self.get_weights,
-            'optimizer': self.optimizer,
-            'is_compiled': self.is_compiled,
-            'callbacks': self.callbacks,
-            'topology': self.topology,
-            'loss': self.loss,
-            '_optimizer_kwargs': self._optimizer_kwargs,
-             '_predict': self._predict,
+            "opt_state": unpack_optimizer_state(self.opt_state),
+            "get_weights": self.get_weights,
+            "optimizer": self.optimizer,
+            "is_compiled": self.is_compiled,
+            "callbacks": self.callbacks,
+            "topology": self.topology,
+            "loss": self.loss,
+            "_optimizer_kwargs": self._optimizer_kwargs,
+            "_predict": self._predict,
         }
         return d
 
-
     def __setstate__(self, d):
-        d['_opt_init'], d['_opt_update'], d['get_weights'] = d['optimizer'](**d['_optimizer_kwargs'])
-        d['opt_state'] = pack_optimizer_state(d['opt_state'])
+        d["_opt_init"], d["_opt_update"], d["get_weights"] = d["optimizer"](
+            **d["_optimizer_kwargs"]
+        )
+        d["opt_state"] = pack_optimizer_state(d["opt_state"])
         self.__dict__ = d
         return
