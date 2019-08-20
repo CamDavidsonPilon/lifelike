@@ -1,73 +1,73 @@
-from jax import jit, grad, random
+from jax import jit, grad, random, vmap
+from jax import numpy as np
 from jax.experimental import stax
-from lifelike.callbacks import Logger
+from jax.experimental.optimizers import unpack_optimizer_state, pack_optimizer_state
+from lifelike.utils import must_be_compiled_first
 
 class Model:
 
     def __init__(self, topology):
         self.topology = topology
-        self.compiled = False
+        self.is_compiled = False
         self.callbacks = []
+
 
     def _log_likelihood(self, params, T, E):
         n = params.shape[0]
-        cum_hz = self.loss.cumulative_hazard(params, T)
-        log_hz = self.loss.log_hazard(params, T)
+        cum_hz = vmap(self.loss.cumulative_hazard)(params, T)
+        log_hz = vmap(self.loss.log_hazard)(params, T)
         ll = 0
         ll = ll + (E * log_hz).sum()
         ll = ll + -(cum_hz).sum()
         return ll / n
 
-    #@must_be_compiled_first
+    @must_be_compiled_first
     def fit(self, X, T, E, epochs=1000, batch_size=32, callbacks=None):
 
+        X, T, E = X.astype(float), T.astype(float), E.astype(float)
 
         if callbacks is not None:
             self.callbacks.extend(callbacks)
-
-        if not self.compiled:
-            raise ValueError("Must run `compile` first.")
 
         # some losses are created dynamically with knowledge of T
         self.loss.inform(T=T, E=E)
         self.topology.extend(self.loss.terminal_layer)
 
-        init_random_params, predict = stax.serial(*self.topology)
-        opt_init, opt_update, get_weights = self.optimizer(**self._optimizer_kwargs)
+        init_random_params, self._predict = stax.serial(*self.topology)
 
         @jit
         def loss(weights, batch):
             X, T, E = batch
-            params = predict(weights, X)
+            params = self._predict(weights, X)
             return -self._log_likelihood(params, T, E)# + L2_reg * optimizers.l2_norm(weights)
 
         @jit
         def update(i, opt_state, batch):
-           weights = get_weights(opt_state)
-           return opt_update(i, grad(loss)(weights, batch), opt_state)
+            weights = self.get_weights(opt_state)
+            return self._opt_update(i, grad(loss)(weights, batch), opt_state)
 
 
         _, init_params = init_random_params(random.PRNGKey(0), (-1, X.shape[1])) # why -1?
-        opt_state = opt_init(init_params)
+        self.opt_state = self._opt_init(init_params)
 
+        # training loop
         for epoch in range(epochs):
-            opt_state = update(epoch, opt_state, (X, T, E))
+            self.opt_state = update(epoch, self.opt_state, (X, T, E))
 
             for callback in self.callbacks:
                 callback(epoch,
-                    opt_state=opt_state,
-                    get_weights=get_weights,
+                    self,
                     batch=(X, T, E),
-                    loss_function=loss,
-                    predict=predict,
-                    loss=self.loss)
+                    loss=loss
+                )
 
 
     def compile(self, optimizer=None, loss=None, optimizer_kwargs=None):
         self.loss = loss
-        self.compiled = True
+        self.is_compiled = True
         self.optimizer = optimizer
         self._optimizer_kwargs = optimizer_kwargs
+        self._opt_init, self._opt_update, self.get_weights = self.optimizer(**self._optimizer_kwargs)
 
 
     def evaluate(self, X, T, E):
@@ -75,5 +75,30 @@ class Model:
 
 
 
-    def predict(self, X):
-        pass
+    def predict_survival_function(self, x, t):
+        weights = self.get_weights(self.opt_state)
+        return vmap(self.loss.survival_function, in_axes=(None, 0))(self._predict(weights, x), t)
+
+
+    def __getstate__(self):
+        # This isn't scalable. I should remove this hardcoded stuff. Note
+        # that _opt_init and _opt_update are not present due to PyCapsule pickling errors.
+        d = {
+            'opt_state': unpack_optimizer_state(self.opt_state),
+            'get_weights': self.get_weights,
+            'optimizer': self.optimizer,
+            'is_compiled': self.is_compiled,
+            'callbacks': self.callbacks,
+            'topology': self.topology,
+            'loss': self.loss,
+            '_optimizer_kwargs': self._optimizer_kwargs,
+             '_predict': self._predict,
+        }
+        return d
+
+
+    def __setstate__(self, d):
+        d['_opt_init'], d['_opt_update'], d['get_weights'] = d['optimizer'](**d['_optimizer_kwargs'])
+        d['opt_state'] = pack_optimizer_state(d['opt_state'])
+        self.__dict__ = d
+        return

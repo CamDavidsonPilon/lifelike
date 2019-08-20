@@ -1,11 +1,14 @@
+from pathlib import Path
+import time
 
 import numpy as np
+from jax import vmap
 from matplotlib import pyplot as plt
+from lifelike.utils import dump
 
 
 class CallBack:
     pass
-
 
 
 class Logger(CallBack):
@@ -13,11 +16,11 @@ class Logger(CallBack):
     def __init__(self, report_every_n_epochs=1):
         self.report_every_n_epochs = report_every_n_epochs
 
-    def __call__(self, epoch, opt_state=None, get_weights=None, batch=None, loss_function=None, **kwargs):
+    def __call__(self, epoch, model, batch=None, loss=None, **kwargs):
         if epoch % self.report_every_n_epochs == 0:
             X, T, E = batch
-            weights = get_weights(opt_state)
-            train_acc = loss_function(weights, (X, T, E))
+            weights = model.get_weights(model.opt_state)
+            train_acc = loss(weights, (X, T, E))
             print("Epoch {:d}: Training set accuracy {:f}".format(epoch, train_acc))
 
 
@@ -30,13 +33,37 @@ class PlotSurvivalCurve(CallBack):
         self.update_every_n_epochs = update_every_n_epochs
         plt.ion()
 
-    def __call__(self, epoch, opt_state=None, get_weights=None, batch=None, loss=None, predict=None, **kwargs):
+    def __call__(self, epoch, model, batch=None, **kwargs):
         if epoch % self.update_every_n_epochs == 0:
-            times = np.linspace(1, 2000, 2000)
+            times = np.linspace(1, 3200, 3200)
             X, T, E = batch
-            weights = get_weights(opt_state)
-            y = loss.survival_function(predict(weights, X[[0]]), times)
+            y = model.predict_survival_function(X[self.individual], times)
             plt.plot(times, y, c='k', alpha=0.15)
+            plt.axvline(T[self.individual], 0, 1, ls="-" if E[self.individual] else "--")
             plt.draw()
             plt.pause(0.0001)
+
+
+
+
+class ModelCheckpoint(CallBack):
+
+    def __init__(self, filepath, save_every_n_epochs=25, prepend_timestamp=True):
+        self.filepath = filepath
+        self.save_every_n_epochs = save_every_n_epochs
+        self.prepend_timestamp = True
+
+    def __call__(self, epoch, model, **kwargs):
+        if epoch % self.save_every_n_epochs == 0:
+
+            filepath = self._prepend_timestamp(self.filepath) if self.prepend_timestamp else self.filepath
+
+            dump(model, filepath)
+            print("Saved model to %s." % filepath)
+
+    @staticmethod
+    def _prepend_timestamp(filepath):
+        path = Path(filepath)
+        return path.with_name("%d_" % int(time.time()) + path.name)
+
 
