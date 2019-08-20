@@ -51,7 +51,7 @@ model = Model([Dense(18), Relu])
 model.compile(
     optimizer=optimizers.adam,
     optimizer_kwargs={"step_size": optimizers.exponential_decay(0.01, 10, 0.999)},
-    loss=losses.ParametricMixture(),
+    loss=losses.NonParametric(),
 )
 
 model.fit(
@@ -62,8 +62,9 @@ model.fit(
     batch_size=32,
     callbacks=[
         Logger(),
-        EarlyStopping(),
+        EarlyStopping(rdelta=1),
         TerminateOnNaN(),
+        PlotSurvivalCurve([65, 66, 67, 68]),
         ModelCheckpoint("testsavefile.pickle", prefix_timestamp=False)
     ],
 )

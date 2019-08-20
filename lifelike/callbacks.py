@@ -25,20 +25,27 @@ class Logger(CallBack):
 
 
 class PlotSurvivalCurve(CallBack):
-    def __init__(self, individual, update_every_n_epochs=250):
-        self.individual = individual
+    def __init__(self, individuals, update_every_n_epochs=250):
+        self.individuals = individuals
         self.update_every_n_epochs = update_every_n_epochs
         plt.ion()
 
     def __call__(self, epoch, model, training_batch=None, **kwargs):
         if epoch % self.update_every_n_epochs == 0:
             times = np.linspace(1, 3200, 3200)
-            X, _, _ = training_batch
-            y = model.predict_survival_function(X[self.individual], times)
-            plt.plot(times, y, c="k", alpha=0.15)
-            plt.axvline(
-                T[self.individual], 0, 1, ls="-" if E[self.individual] else "--"
-            )
+            X, T, E = training_batch
+            colors = iter(plt.cm.tab10(np.linspace(0,1,len(self.individuals))))
+
+            for individual, color in zip(self.individuals, colors):
+                y = model.predict_survival_function(X[individual], times)
+                plt.plot(times, y, c=color, alpha=0.20)
+
+                if epoch == self.update_every_n_epochs:
+                    # only need to plot once
+                    plt.axvline(
+                        T[individual], 0, 1, ls="-" if E[individual] else "--", c=color
+                    )
+
             plt.draw()
             plt.pause(0.0001)
 

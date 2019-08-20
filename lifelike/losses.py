@@ -54,7 +54,6 @@ class ParametricMixture(Loss):
 
 
     """
-
     N_OUTPUTS = 3 + 2 + 2
 
     def __init__(self):

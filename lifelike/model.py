@@ -63,6 +63,7 @@ class Model:
                     callback(epoch, self, training_batch=(X, T, E), loss=loss)
                 except StopIteration:
                     continue_training = False
+                    break
 
             epoch += 1
 
@@ -75,9 +76,11 @@ class Model:
             **self._optimizer_kwargs
         )
 
+    @must_be_compiled_first
     def evaluate(self, X, T, E):
         pass
 
+    @must_be_compiled_first
     def predict_survival_function(self, x, t):
         weights = self.get_weights(self.opt_state)
         return vmap(self.loss.survival_function, in_axes=(None, 0))(
