@@ -12,7 +12,7 @@ from jax.experiment import optimizers
 import lifelike.losses as losses
 from lifelike import Model
 from lifelike.callbacks import History, ModelCheckpoint, EarlyStopping
-from lifelike.utils import save
+from lifelike.utils import dump
 
 
 model = Model([
@@ -29,11 +29,11 @@ model.compile(optimizer=optimizers.adam,
 model.fit(x_train, t_train, e_train,
     epochs=10,
     batch_size=32,
-    callbacks=[History(), ModelCheckpoint(), EarlyStopping()]
+    callbacks=[ModelCheckpoint("filename.pickle"), Logger()]
 )
 
 loss_ = model.evaluate(x_test, t_test, e_test)
 
 model.predict(x_novel)
-save(model, "filename")
+dump(model, "filename.pickle")
 ```

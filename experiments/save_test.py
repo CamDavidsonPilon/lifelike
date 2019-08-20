@@ -7,6 +7,7 @@ import numpy as np
 import lifelike.losses as losses
 from lifelike import Model
 from lifelike.utils import dump, load
+from lifelike.callbacks import *
 
 
 def get_rossi_dataset():
@@ -44,8 +45,6 @@ model = load( "testsavefile")
 print(model.predict_survival_function(x_train[0], np.arange(0, 10)))
 
 model.fit(x_train, t_train, e_train,
-    epochs=2,
-    batch_size=32
+    epochs=100,
+    callbacks=[Logger(report_every_n_epochs=5), ModelCheckpoint("experiments/saved_model.pickle", save_every_n_epochs=25)]
 )
-
-print(model.predict_survival_function(x_train[0], np.arange(0, 10)))

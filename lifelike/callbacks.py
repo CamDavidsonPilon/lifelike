@@ -1,12 +1,14 @@
+from pathlib import Path
+import time
 
 import numpy as np
 from jax import vmap
 from matplotlib import pyplot as plt
-from lifelike.utils import save
+from lifelike.utils import dump
+
 
 class CallBack:
     pass
-
 
 
 class Logger(CallBack):
@@ -44,14 +46,24 @@ class PlotSurvivalCurve(CallBack):
 
 
 
-class SaveModel(CallBack):
-    def __init__(self, filepath, save_every_n_epochs=1):
+class ModelCheckpoint(CallBack):
+
+    def __init__(self, filepath, save_every_n_epochs=25, prepend_timestamp=True):
         self.filepath = filepath
         self.save_every_n_epochs = save_every_n_epochs
+        self.prepend_timestamp = True
 
-    def __call__(self, epoch, model):
+    def __call__(self, epoch, model, **kwargs):
         if epoch % self.save_every_n_epochs == 0:
-            save(model, self.filepath)
 
+            filepath = self._prepend_timestamp(self.filepath) if self.prepend_timestamp else self.filepath
+
+            dump(model, filepath)
+            print("Saved model to %s." % filepath)
+
+    @staticmethod
+    def _prepend_timestamp(filepath):
+        path = Path(filepath)
+        return path.with_name("%d_" % int(time.time()) + path.name)
 
 
