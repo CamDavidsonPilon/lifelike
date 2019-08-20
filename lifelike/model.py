@@ -81,23 +81,24 @@ class Model:
 
 
     def __getstate__(self):
-        # thanks I hate it.
-        # This isn't scalable. I should remove this hardcoded
+        # This isn't scalable. I should remove this hardcoded stuff. Note
+        # that _opt_init and _opt_update are not present due to PyCapsule pickling errors.
         d = {
             'opt_state': unpack_optimizer_state(self.opt_state),
             'get_weights': self.get_weights,
             'optimizer': self.optimizer,
             'is_compiled': self.is_compiled,
+            'callbacks': self.callbacks,
+            'topology': self.topology,
             'loss': self.loss,
-            '_opt_update': self._opt_update,
-            '_opt_init': self._opt_init,
-            '_predict': self._predict,
-            #'topology': self.topology, # anonymous f can't be pickled
+            '_optimizer_kwargs': self._optimizer_kwargs,
+             '_predict': self._predict,
         }
         return d
 
 
     def __setstate__(self, d):
+        d['_opt_init'], d['_opt_update'], d['get_weights'] = d['optimizer'](**d['_optimizer_kwargs'])
         d['opt_state'] = pack_optimizer_state(d['opt_state'])
         self.__dict__ = d
         return

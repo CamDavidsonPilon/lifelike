@@ -28,10 +28,6 @@ class Loss():
     def inform(self, **kwargs):
         pass
 
-    def __getstate__(self):
-        del self.__dict__['terminal_layer'] # can't be pickled
-        return self.__dict__
-
 
 class GeneralizedGamma(Loss):
 

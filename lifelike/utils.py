@@ -1,5 +1,5 @@
 from functools import wraps
-import dill
+import cloudpickle as pickle
 
 def must_be_compiled_first(function):
     @wraps(function)
@@ -14,11 +14,11 @@ def must_be_compiled_first(function):
 def dump(model, filepath):
     """filepath is a string"""
     with open(filepath, "wb") as f:
-        dill.dump(model, f)
+        pickle.dump(model, f)
 
 
 
 def load(filepath):
     """filepath is a string"""
     with open(filepath, "rb") as f:
-        return dill.load(f)
+        return pickle.load(f)
