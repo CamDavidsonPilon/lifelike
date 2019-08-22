@@ -1,9 +1,9 @@
+import numpy.random as npr
 from jax import jit, grad, random, vmap
 from jax import numpy as np
 from jax.experimental import stax
 from jax.experimental.optimizers import unpack_optimizer_state, pack_optimizer_state
 from lifelike.utils import must_be_compiled_first
-
 
 class Model:
     def __init__(self, topology):
@@ -24,6 +24,19 @@ class Model:
     def fit(self, X, T, E, epochs=1000, batch_size=32, callbacks=None):
 
         X, T, E = X.astype(float), T.astype(float), E.astype(float)
+        num_train = X.shape[0]
+        num_complete_batches, leftover = divmod(num_train, batch_size)
+        num_batches = num_complete_batches + bool(leftover)
+
+        def data_stream():
+            rng = npr.RandomState(0)
+            while True:
+              perm = rng.permutation(num_train)
+              for i in range(num_batches):
+                batch_idx = perm[i * batch_size:(i + 1) * batch_size]
+                yield X[batch_idx], T[batch_idx], E[batch_idx]
+
+        batches = data_stream()
 
         if callbacks is not None:
             self.callbacks.extend(callbacks)
@@ -56,7 +69,8 @@ class Model:
         epoch = 0
         continue_training = True
         while epoch < epochs and continue_training:
-            self.opt_state = update(epoch, self.opt_state, (X, T, E))
+            for _ in range(num_batches):
+                self.opt_state = update(epoch, self.opt_state, next(batches))
 
             for callback in self.callbacks:
                 try:

@@ -11,7 +11,6 @@ def get_colon_dataset():
     from patsy import dmatrix
 
     df = pd.read_csv("experiments/colon.csv", index_col=0).dropna()
-    df = df[df["etype"] == 2]
 
     model_string = """{extent} +
         {rx} +
@@ -50,7 +49,7 @@ model = Model([Dense(18), Relu])
 
 model.compile(
     optimizer=optimizers.adam,
-    optimizer_kwargs={"step_size": optimizers.exponential_decay(0.01, 10, 0.999)},
+    optimizer_kwargs={"step_size": 0.001},
     loss=losses.NonParametric(),
 )
 
@@ -59,12 +58,11 @@ model.fit(
     t_train,
     e_train,
     epochs=100000,
-    batch_size=32,
+    batch_size=100,
     callbacks=[
-        Logger(),
+        Logger(report_every_n_epochs=50),
         EarlyStopping(rdelta=1),
         TerminateOnNaN(),
-        PlotSurvivalCurve([65, 66, 67, 68]),
-        ModelCheckpoint("testsavefile.pickle", prefix_timestamp=False)
+        ModelCheckpoint("testsavefile.pickle", prefix_timestamp=False, save_every_n_epochs=200)
     ],
 )

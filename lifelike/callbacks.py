@@ -25,6 +25,10 @@ class Logger(CallBack):
 
 
 class PlotSurvivalCurve(CallBack):
+    """
+    Doesn't really work with batch size < total size
+
+    """
     def __init__(self, individuals, update_every_n_epochs=250):
         self.individuals = individuals
         self.update_every_n_epochs = update_every_n_epochs
@@ -37,13 +41,14 @@ class PlotSurvivalCurve(CallBack):
             colors = iter(plt.cm.tab10(np.linspace(0,1,len(self.individuals))))
 
             for individual, color in zip(self.individuals, colors):
+                print(individual)
                 y = model.predict_survival_function(X[individual], times)
                 plt.plot(times, y, c=color, alpha=0.20)
 
                 if epoch == self.update_every_n_epochs:
                     # only need to plot once
                     plt.axvline(
-                        T[individual], 0, 1, ls="-" if E[individual] else "--", c=color
+                        T[individual], 0, 1, ls="-" if E[individual] else "--", c=color, alpha=0.80
                     )
 
             plt.draw()
