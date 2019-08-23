@@ -36,7 +36,7 @@ class PlotSurvivalCurve(CallBack):
 
     def __call__(self, epoch=None, model=None, training_batch=None, **kwargs):
         if epoch % self.update_every_n_epochs == 0 and epoch > 0:
-            times = np.linspace(1, 70, 70)
+            times = np.linspace(1, 120, 150)
             X, T, E = training_batch
             colors = iter(plt.cm.rainbow(np.linspace(0, 1, len(self.individuals) + 2)))
 
@@ -49,7 +49,6 @@ class PlotSurvivalCurve(CallBack):
                     plt.axvline(
                         T[individual], 0, 1, ls="-" if E[individual] else "--", c=color, alpha=0.85
                     )
-
             plt.draw()
             plt.pause(0.0001)
 
@@ -61,7 +60,7 @@ class ModelCheckpoint(CallBack):
         self.prefix_timestamp = prefix_timestamp
 
     def __call__(self, epoch=None, model=None, **kwargs):
-        if epoch % self.save_every_n_epochs == 0:
+        if epoch % self.save_every_n_epochs == 0 and epoch > 0:
 
             filepath = (
                 self._prepend_timestamp(self.filepath)

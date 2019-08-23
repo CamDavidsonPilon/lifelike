@@ -5,6 +5,15 @@ import lifelike.losses as losses
 from lifelike import Model
 from lifelike.callbacks import *
 
+def get_generated_churn_dataset():
+    df = pd.read_csv("experiments/churn.csv")
+
+    T = df.pop("T").values
+    E = df.pop("E").values
+    X = df.values
+
+    return X, T, E
+
 def get_telcom_churn_dataset():
 
     churn_data = pd.read_csv('https://raw.githubusercontent.com/'
@@ -20,12 +29,15 @@ def get_telcom_churn_dataset():
                         columns=churn_data.columns.difference(['tenure', 'MonthlyCharges']),
                         drop_first=True)
 
+    df = df[df['tenure'] > 0]
+    T = df.pop("tenure").values
+    E = df.pop("Churn_Yes").values
+    X = df.values
 
-    T_train = df.pop("tenure").values
-    E_train = df.pop("Churn_Yes").values
-    X_train = df.values
 
-    return X_train, T_train, E_train
+    X = (X - X.mean(0)) / X.std(0)
+
+    return X, T, E
 
 
 def get_colon_dataset():
@@ -63,30 +75,29 @@ def get_rossi_dataset():
     return X_train, T_train, E_train
 
 
-x_train, t_train, e_train = get_telcom_churn_dataset()
+x_train, t_train, e_train = get_generated_churn_dataset()
 
-
-model = Model([Dense(13), Relu, Dense(13), Relu])
+model = Model([Dense(8), Relu])
 
 model.compile(
     optimizer=optimizers.adam,
-    optimizer_kwargs={"step_size": 0.001},
+    optimizer_kwargs={"step_size": optimizers.exponential_decay(0.001, 1, 0.9995)},
     l2=0.001,
-    loss=losses.NonParametric(),
+    loss=losses.NonParametric(n_breakpoints=12),
 )
 
 model.fit(
     x_train,
     t_train,
     e_train,
-    epochs=100000,
-    batch_size=10000,
-    validation_split=0.1,
+    epochs=10000,
+    batch_size=50,
+    validation_split=0.2,
     callbacks=[
-        Logger(report_every_n_epochs=5),
+        Logger(report_every_n_epochs=1),
         EarlyStopping(rdelta=1.),
         TerminateOnNaN(),
-        PlotSurvivalCurve(individuals=[7,8,9]),
+        PlotSurvivalCurve(individuals=[35,45,46], update_every_n_epochs=1),
         ModelCheckpoint("testsavefile.pickle", prefix_timestamp=False, save_every_n_epochs=200)
     ],
 )

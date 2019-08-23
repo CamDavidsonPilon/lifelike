@@ -2,6 +2,7 @@ import numpy as onp
 from jax.experimental import stax
 from jax import numpy as np
 from jax import scipy as sp
+from jax.scipy.special import logsumexp
 from jax import grad, vmap
 from scipy.optimize import root_scalar
 from scipy.stats import gaussian_kde
@@ -57,7 +58,7 @@ class ParametricMixture(Loss):
 
     def __init__(self):
         self.terminal_layer = [
-            stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-8), b_init=stax.randn(1e-8))
+            stax.Dense(self.N_OUTPUTS, W_init=stax.randn(1e-10), b_init=stax.randn(1e-10))
         ]
 
     def cumulative_hazard(self, params, t):
@@ -74,7 +75,9 @@ class ParametricMixture(Loss):
             np.hstack(
                 (
                     np.log(p1) - (t / lambda_) ** rho_,
-                    np.log(p2) - np.log1p((t / alpha_) ** beta_),
+                    np.log(p2) - sp.special.logsumexp(np.hstack(
+                        (0, beta_ * np.log(t) - beta_ * np.log(alpha_)))
+                    ),
                     np.log(p3),
                 )
             )
@@ -135,7 +138,7 @@ class NonParametric(PiecewiseConstant):
         dist = gaussian_kde(observed_event_times)
 
         if self.n_breakpoints is None:
-            n_breakpoints = min(int(n_obs / 15), onp.unique(observed_event_times).shape[0])
+            n_breakpoints = min(int(np.sqrt(n_obs) / 2), onp.unique(observed_event_times).shape[0])
         else:
             n_breakpoints = self.n_breakpoints
 
@@ -159,6 +162,5 @@ class NonParametric(PiecewiseConstant):
                 fprime=lambda x: dist(x) / CDF_M,
                 starting_point=sol)
             breakpoints[i] = sol
-
-        print(breakpoints)
+        print(n_breakpoints)
         return breakpoints

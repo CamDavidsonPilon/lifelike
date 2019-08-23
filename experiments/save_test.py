@@ -50,6 +50,6 @@ model.fit(
     epochs=100,
     callbacks=[
         Logger(report_every_n_epochs=5),
-        ModelCheckpoint("experiments/saved_model.pickle", save_every_n_epochs=25),
+        ModelCheckpoint("experiments/saved_model.pickle", save_every_n_epochs=500),
     ],
 )
