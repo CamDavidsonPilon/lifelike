@@ -3,7 +3,6 @@ from jax.experimental import stax
 from jax import numpy as np
 from jax import scipy as sp
 from jax import grad, vmap
-from jax.scipy.stats import norm
 from scipy.optimize import root_scalar
 from scipy.stats import gaussian_kde
 
@@ -129,25 +128,37 @@ class NonParametric(PiecewiseConstant):
         super(NonParametric, self).__init__(breakpoints)
 
     def create_breakpoints(self, observed_event_times):
-        def solve_inverse_cdf_problem(p, dist, starting_point=0):
-            f = lambda x: dist.integrate_box_1d(0, x) - p
-            return root_scalar(f, x0=starting_point, fprime=dist).root
+        def solve_inverse_cdf_problem(f, fprime=None, starting_point=0):
+            return root_scalar(f, x0=starting_point, fprime=fprime).root
 
         n_obs = observed_event_times.shape[0]
         dist = gaussian_kde(observed_event_times)
 
         if self.n_breakpoints is None:
-            n_breakpoints = int(n_obs / 15)
+            n_breakpoints = min(int(n_obs / 15), onp.unique(observed_event_times).shape[0])
         else:
             n_breakpoints = self.n_breakpoints
 
         breakpoints = onp.empty(n_breakpoints)
 
+        # We scale our pdf/cdf by CDF(max observed time) so that we will
+        # never have breakpoints greater than the max observed time.
+        # call this cdf'
+        MAX = observed_event_times.max()
+        CDF_M =  dist.integrate_box_1d(0, MAX)
+
         sol = 0
         for i, p in enumerate(np.linspace(0, 1, n_breakpoints + 2)[1:-1]):
             # solve the following simple root problem:
-            # cdf(x) = p
-            sol = solve_inverse_cdf_problem(p, dist, starting_point=sol)
+            # cdf'(x) = p
+            # cdf(x)/cdf(M) = p
+            # cdf(x) = p * cdf(M)
+            # cdf(x) - p*cdf(M) = 0
+            sol = solve_inverse_cdf_problem(
+                f=lambda x: dist.integrate_box_1d(0, x) / CDF_M - p,
+                fprime=lambda x: dist(x) / CDF_M,
+                starting_point=sol)
             breakpoints[i] = sol
 
+        print(breakpoints)
         return breakpoints

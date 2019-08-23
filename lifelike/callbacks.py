@@ -8,20 +8,20 @@ from lifelike.utils import dump
 
 
 class CallBack:
-
     def _compute_loss(self, model, batch, loss):
         X, T, E = batch
         weights = model.get_weights(model.opt_state)
         return loss(weights, (X, T, E))
 
 
+
 class Logger(CallBack):
     def __init__(self, report_every_n_epochs=10):
         self.report_every_n_epochs = report_every_n_epochs
 
-    def __call__(self, epoch, model, training_batch=None, loss=None, **kwargs):
+    def __call__(self, epoch=None, model=None, training_batch=None, testing_batch=None, loss=None, **kwargs):
         if epoch % self.report_every_n_epochs == 0:
-            print("Epoch {:d}: Training set accuracy {:f}".format(epoch, self._compute_loss(model, training_batch, loss)))
+            print("Epoch {:d}: training set accuracy {:f}, testing set accuracy {:f}".format(epoch, self._compute_loss(model, training_batch, loss), self._compute_loss(model, testing_batch, loss)))
 
 
 class PlotSurvivalCurve(CallBack):
@@ -34,21 +34,20 @@ class PlotSurvivalCurve(CallBack):
         self.update_every_n_epochs = update_every_n_epochs
         plt.ion()
 
-    def __call__(self, epoch, model, training_batch=None, **kwargs):
-        if epoch % self.update_every_n_epochs == 0:
-            times = np.linspace(1, 3200, 3200)
+    def __call__(self, epoch=None, model=None, training_batch=None, **kwargs):
+        if epoch % self.update_every_n_epochs == 0 and epoch > 0:
+            times = np.linspace(1, 70, 70)
             X, T, E = training_batch
-            colors = iter(plt.cm.tab10(np.linspace(0,1,len(self.individuals))))
+            colors = iter(plt.cm.rainbow(np.linspace(0, 1, len(self.individuals) + 2)))
 
             for individual, color in zip(self.individuals, colors):
-                print(individual)
                 y = model.predict_survival_function(X[individual], times)
                 plt.plot(times, y, c=color, alpha=0.20)
 
                 if epoch == self.update_every_n_epochs:
                     # only need to plot once
                     plt.axvline(
-                        T[individual], 0, 1, ls="-" if E[individual] else "--", c=color, alpha=0.80
+                        T[individual], 0, 1, ls="-" if E[individual] else "--", c=color, alpha=0.85
                     )
 
             plt.draw()
@@ -61,7 +60,7 @@ class ModelCheckpoint(CallBack):
         self.save_every_n_epochs = save_every_n_epochs
         self.prefix_timestamp = prefix_timestamp
 
-    def __call__(self, epoch, model, **kwargs):
+    def __call__(self, epoch=None, model=None, **kwargs):
         if epoch % self.save_every_n_epochs == 0:
 
             filepath = (
@@ -92,7 +91,7 @@ class EarlyStopping(CallBack):
         self.best_test_loss = np.inf
         self.best_train_loss = np.inf
 
-    def __call__(self, epoch, model, training_batch=None, loss=None, **kwargs):
+    def __call__(self, epoch=None, model=None, training_batch=None, loss=None, **kwargs):
         train_acc = self._compute_loss(model, training_batch, loss)
 
         if train_acc < self.best_train_loss:
@@ -106,7 +105,7 @@ class EarlyStopping(CallBack):
 class TerminateOnNaN(CallBack):
 
 
-    def __call__(self, epoch, model, training_batch=None, loss=None, **kwargs):
+    def __call__(self, epoch=None, model=None, training_batch=None, loss=None, **kwargs):
         if np.isnan(self._compute_loss(model, training_batch, loss)):
             print("Stopping early due to NaNs.")
             raise StopIteration()

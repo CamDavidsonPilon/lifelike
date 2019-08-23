@@ -24,7 +24,8 @@ model = Model([
 
 
 model.compile(optimizer=optimizers.adam,
-              loss=losses.GeneralizedGamma())
+              loss=losses.GeneralizedGamma(),
+              l2=0.1)
 
 model.fit(x_train, t_train, e_train,
     epochs=10,
