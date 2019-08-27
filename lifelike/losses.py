@@ -162,5 +162,4 @@ class NonParametric(PiecewiseConstant):
                 fprime=lambda x: dist(x) / CDF_M,
                 starting_point=sol)
             breakpoints[i] = sol
-        print(n_breakpoints)
         return breakpoints

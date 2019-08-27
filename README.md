@@ -24,16 +24,14 @@ model = Model([
 
 
 model.compile(optimizer=optimizers.adam,
-              loss=losses.GeneralizedGamma(),
+              loss=losses.NonParametric(),
               l2=0.1)
 
 model.fit(x_train, t_train, e_train,
-    epochs=10,
+    epochs=1000,
     batch_size=32,
     callbacks=[ModelCheckpoint("filename.pickle"), Logger()]
 )
-
-loss_ = model.evaluate(x_test, t_test, e_test)
 
 model.predict(x_novel)
 

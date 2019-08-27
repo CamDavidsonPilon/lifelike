@@ -78,8 +78,9 @@ class Model:
         self.opt_state = self._opt_init(init_params)
 
         # training loop
-        epoch = 0
+        epoch = 1
         continue_training = True
+
         while epoch < epochs and continue_training:
             for _ in range(num_batches):
                 self.opt_state = update(epoch, self.opt_state, next(batches))
@@ -106,10 +107,6 @@ class Model:
         self._opt_init, self._opt_update, self.get_weights = self.optimizer(
             **self._optimizer_kwargs
         )
-
-    @must_be_compiled_first
-    def evaluate(self, X, T, E):
-        pass
 
     @must_be_compiled_first
     def predict_survival_function(self, x, t):
