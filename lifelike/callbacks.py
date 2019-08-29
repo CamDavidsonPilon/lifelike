@@ -16,6 +16,13 @@ class CallBack:
 
 
 class Logger(CallBack):
+    """
+    Print out to stdout important metrics.
+
+    TODO: include epoch training time
+
+
+    """
     def __init__(self, report_every_n_epochs=10):
         self.report_every_n_epochs = report_every_n_epochs
 
@@ -26,6 +33,12 @@ class Logger(CallBack):
 
 class PlotSurvivalCurve(CallBack):
     """
+    Display the predicted survival function for individuals. Useful for debugging.
+
+
+    Warning
+    --------
+
     Doesn't really work with batch size < total size
 
     """
@@ -54,6 +67,10 @@ class PlotSurvivalCurve(CallBack):
 
 
 class ModelCheckpoint(CallBack):
+    """
+    Save the model, including weights and loss, to disk.
+
+    """
     def __init__(self, filepath, save_every_n_epochs=50, prefix_timestamp=True):
         self.filepath = filepath
         self.save_every_n_epochs = save_every_n_epochs
@@ -102,7 +119,10 @@ class EarlyStopping(CallBack):
 
 
 class TerminateOnNaN(CallBack):
+    """
+    If NaNs are detected, the training is stopped.
 
+    """
 
     def __call__(self, epoch=None, model=None, training_batch=None, loss=None, **kwargs):
         if np.isnan(self._compute_loss(model, training_batch, loss)):

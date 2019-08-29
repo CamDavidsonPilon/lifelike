@@ -7,10 +7,37 @@ from jax.experimental.optimizers import unpack_optimizer_state, pack_optimizer_s
 from lifelike.utils import must_be_compiled_first
 
 class Model:
+    """
+    Parameters
+    -----------
+
+    topology: list of stax layers
+        topology is a list of jax.experimental.stax layers
+
+
+    Example
+    --------
+
+    >>> from jax.experimental.stax import Dense, Dropout, Tanh
+    >>> model = Model([Dense(64 * 64), Tanh, Dropout(), Dense(10)])
+
+
+    """
     def __init__(self, topology):
         self.topology = topology
         self.is_compiled = False
         self.callbacks = []
+
+
+    def __repr__(self):
+        classname = self.__class__.__name__
+        try:
+            s = """<lifelike.%s: %s loss>""" % (
+                classname, self.loss
+            )
+        except IndexError:
+            s = """<lifelike.%s>""" % classname
+        return s
 
     def _log_likelihood(self, params, T, E):
         n = T.shape[0]
@@ -23,6 +50,27 @@ class Model:
 
     @must_be_compiled_first
     def fit(self, X, T, E, epochs=1, batch_size=32, callbacks=None, validation_split=0.0):
+        """
+        Fit the model to training data, and optionally split into testing data as well.
+
+        Parameters
+        -----------
+
+        X: NumPy array
+            The dataset of features/covariates/variables
+        Y: NumPy array
+            A (n,) or (n,1) array of durations the subject was observed for. Must be non-negative.
+        E: NumPy array
+            A (n,) or (n,1) array of {0, 1} denoting whether the event was observed (1) or not (0).
+        epochs: int
+            The number of epochs to train for.
+        batch_size: int
+            the batch size per updating step
+        callbacks: list
+            A list of lifelike.callback objects
+        validation_split: float
+            A float between 0 (no validation data) and 1 (all validation data).
+        """
         rng = npr.RandomState(0)
 
         def data_stream(X, T, E, num_batches, num_train):
@@ -60,12 +108,16 @@ class Model:
         init_random_params, self._predict = stax.serial(*self.topology)
 
         @jit
+        def smoothing_penalty(params):
+            return np.diff(params).var()
+
+        @jit
         def loss(weights, batch):
             X, T, E = batch
             params = self._predict(weights, X)
-            return -self._log_likelihood(
-                params, T, E
-            )  + self.l2 * l2_norm(weights)
+            return -self._log_likelihood(params, T, E) \
+                     + self.weight_l2 * l2_norm(weights) \
+                     + self.smoothing_l2 * smoothing_penalty(params)
 
         @jit
         def update(i, opt_state, batch):
@@ -98,10 +150,29 @@ class Model:
 
             epoch += 1
 
-    def compile(self, optimizer=None, loss=None, optimizer_kwargs=None, l2=0.0):
+    def compile(self, optimizer=None, loss=None, optimizer_kwargs=None, weight_l2=0.0, smoothing_l2=0.0):
+        """
+        Before fitting, the model must be compiled with network architecture options.
+
+
+        Parameters
+        ------------
+        optimizer:
+            an optimize from jax.experimental.optimizers
+        loss:
+            an object from lifelike.losses
+        optimizer_kwargs:
+            kwargs to pass into the optimizer chosen
+        weight_l2: float
+            a non-negative value that scales a L2 penalizer on _all_ weights (kernal and bias)
+        smoothing_l2: float
+            Designed for piecewise losses, this penalizes adjacent interal's hazards to be closer together.
+
+        """
         self.loss = loss
         self.is_compiled = True
-        self.l2 = l2
+        self.weight_l2 = weight_l2
+        self.smoothing_l2 = smoothing_l2
         self.optimizer = optimizer
         self._optimizer_kwargs = optimizer_kwargs
         self._opt_init, self._opt_update, self.get_weights = self.optimizer(
@@ -136,7 +207,8 @@ class Model:
             "opt_state": unpack_optimizer_state(self.opt_state),
             "get_weights": self.get_weights,
             "optimizer": self.optimizer,
-            "l2": self.l2,
+            "weight_l2": self.weight_l2,
+            "smoothing_l2": self.smoothing_l2,
             "is_compiled": self.is_compiled,
             "callbacks": self.callbacks,
             "topology": self.topology,

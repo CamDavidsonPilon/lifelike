@@ -12,6 +12,13 @@ class Loss:
     terminal_layer = None
     N_OUTPUTS = None
 
+    def __repr__(self):
+        classname = self.__class__.__name__
+        s = """<lifelike.%s, n_outputs=%d>""" % (
+            classname, self.N_OUTPUTS
+        )
+        return s
+
     def cumulative_hazard(self, params, t):
         # must override this or survival_function
         return -np.log(self.survival_function(params, t))
@@ -36,13 +43,14 @@ class GeneralizedGamma(Loss):
 
     def __init__(self, topology):
         self.terminal_layer = [stax.Dense(self.N_OUTPUTS)]
-        raise NotImplementedError()
+        raise NotImplementedError("Jax still needs to have support for incomplete gamma function")
 
     def cumulative_hazard(self, params, t):
         pass
 
     def log_hazard(self, params, t):
         pass
+
 
 
 class ParametricMixture(Loss):
@@ -96,6 +104,16 @@ class PiecewiseConstant(Loss):
             stax.Exp,
         ]
 
+    def __repr__(self):
+        try:
+            classname = self.__class__.__name__
+            s = """<lifelike.%s, breakpoints=%s>""" % (
+                classname, self.breakpoints
+            )
+        except:
+            s = """<lifelike.%s>""" % classname
+        return s
+
     def cumulative_hazard(self, params, t):
         M = np.minimum(self.breakpoints, t)
         M = np.diff(M)
@@ -116,7 +134,8 @@ class PiecewiseConstant(Loss):
 
 class NonParametric(PiecewiseConstant):
     """
-    We create the concentration of breakpoints in proportional to the number of subjects that died at that time.
+    We create the concentration of breakpoints in proportional to the number of subjects that died around that time.
+    See blog post at https://dataorigami.net/blogs/napkin-folding/non-parametric-survival-function-prediction
     """
 
     def __init__(self, n_breakpoints=None):
